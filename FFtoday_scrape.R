@@ -17,11 +17,10 @@ names(positions) <- c('QB', 'RB', 'WR', 'TE', 'K', 'DEF')
 
 player.stats <- data.frame()
 
-# TODO(nadir.sidi): Figure out why this throws an error at or after week 9
-
 for(season in seasons) {
   for(week in game.weeks) {
     for(position in positions) {
+      print(paste("Starting position ", position, "for week", week, "in season", season))
       fftoday.page <- read_html(sprintf("http://www.fftoday.com/stats/playerstats.php?Season=%s&GameWeek=%s&PosID=%s&LeagueID=26955", 
                                         season, week, position))
       table <- fftoday.page %>%
@@ -41,13 +40,15 @@ for(season in seasons) {
       # Set the first column title
       colnames(table)[1] <- "First.Name"
       
+      # Account for instances where the table is blank (early seasons, playoff stats missing)
+      if(nrow(table) == 0) {
+        break()
+      }
+      
       # Split into first and last names, account for defensive players = teams
       
-      # TODO(nadir): Fix RegEx so it handles teams beyond single digit numbers &
-      #              Doesn't get rid of the 49ers
-      
       if(names(positions)[which(positions == position)] == "DEF") {
-        table$Team <- sapply(table[,1], function(x) {gsub("[0-9].", "", x)  })
+        table$Team <- sapply(table[,1], function(x) {gsub("^\\d+[.]\\s+", "", x)})
         table <- table[,-1]
       } else {
         table$Last.Name <- sapply(table$First.Name, function(x) {strsplit(x, split = "[ ]")[[1]][3]})
