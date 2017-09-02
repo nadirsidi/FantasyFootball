@@ -1,5 +1,7 @@
 library(plyr)
 library(dplyr)
+library(ggplot2)
+library(tidyr)
 
 # Load rvest for scraping
 library(rvest)
@@ -65,4 +67,34 @@ for(season in seasons) {
     }
   }
 }
-      
+
+# Read in the saved data
+# player.stats <- read.csv("/home/nadirsidi/Documents/R/FantasyFootball/Data/FFtoday_raw_data.csv",
+#                          stringsAsFactors = F)
+
+# Format the columns
+player.stats.formatted <- player.stats %>%
+  dplyr::mutate(FGPct = as.numeric(gsub("[%]", "", `FG%`))) %>%
+  dplyr::select(-G, -`FG%`, -`Fantasy.FPts/G`) %>%
+  dplyr::rename(PaYd = `PaYd/G`,
+                RuYd = `RuYd/G`) %>%
+  dplyr::mutate(FGPct = FGPct/100)
+
+# Rearrange the columns
+player.stats.formatted <- player.stats.formatted[c("First.Name", "Last.Name","position", "Team", "week", 
+                                                   colnames(player.stats.formatted)[-c(1,2,12,13,15)])]
+
+# Format the columns as numeric
+cols.num <- c(6:32)
+player.stats.formatted[cols.num] <- sapply(player.stats.formatted[cols.num],as.numeric)
+
+# Combine the defensive stats to match the column names of the offensive players
+player.stats.formatted <- player.stats.formatted %>%
+  dplyr::mutate(Rushing.Yard = ifelse(is.na(RuYd), Rushing.Yard, RuYd)) %>%
+  dplyr::mutate(Passing.Yard = ifelse(is.na(PaYd), Passing.Yard, PaYd)) %>%
+  dplyr::select(-c(RuYd, PaYd))
+
+# Save the data (including RDS to avoid re-formatting columns)
+write.csv(player.stats.formatted, file = "~/Documents/R/FantasyFootball/Data/FFtoday_formatted.csv",
+          row.names = F)
+saveRDS(player.stats.formatted, file = "~/Documents/R/FantasyFootball/Data/FFtoday_formatted.RDS")
