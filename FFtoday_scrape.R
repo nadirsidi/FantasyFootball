@@ -23,47 +23,53 @@ for(season in seasons) {
   for(week in game.weeks) {
     for(position in positions) {
       print(paste("Starting position ", position, "for week", week, "in season", season))
-      fftoday.page <- read_html(sprintf("http://www.fftoday.com/stats/playerstats.php?Season=%s&GameWeek=%s&PosID=%s&LeagueID=26955", 
-                                        season, week, position))
-      table <- fftoday.page %>%
-        html_nodes("table") %>%
-        .[[11]] %>%
-        html_table()
       
-      # Concat the first and second rows to make the column headings
-      colnames(table) <- sapply(seq(1:ncol(table)), function(x) { paste(table[1,x], table[2,x], sep = ".") } )
-      
-      # Remove the first and second rows
-      table <- table[-(1:2),]
-      
-      # Remove any leading periods from the column names
-      colnames(table) <- sub("^[.]", "", colnames(table))
-      
-      # Set the first column title
-      colnames(table)[1] <- "First.Name"
-      
-      # Account for instances where the table is blank (early seasons, playoff stats missing)
-      if(nrow(table) == 0) {
-        break()
-      }
-      
-      # Split into first and last names, account for defensive players = teams
-      
-      if(names(positions)[which(positions == position)] == "DEF") {
-        table$Team <- sapply(table[,1], function(x) {gsub("^\\d+[.]\\s+", "", x)})
-        table <- table[,-1]
-      } else {
-        table$Last.Name <- sapply(table$First.Name, function(x) {strsplit(x, split = "[ ]")[[1]][3]})
-        table$First.Name <- sapply(table$First.Name, function(x) {strsplit(x, split = "[ ]")[[1]][2]})
-      }
+      # Add a loop to get all pages-- some positions have tables that span multiple pages
+      # An upper-limit of 5 is plenty. There is logic that will exit this loop when the table is blank
+      for(page in 0:5) {
         
-      # Add the position, season, and week
-      table$position <- names(positions)[which(positions == position)]
-      table$season <- season
-      table$week <- names(game.weeks)[which(game.weeks == week)]
-      
-      player.stats <- rbind.fill(player.stats, table)
-      # browser()
+        fftoday.page <- read_html(sprintf("http://www.fftoday.com/stats/playerstats.php?Season=%s&GameWeek=%s&PosID=%s&cur_page=%s&LeagueID=26955", 
+                                          season, week, position, page))
+        table <- fftoday.page %>%
+          html_nodes("table") %>%
+          .[[11]] %>%
+          html_table()
+        
+        # Concat the first and second rows to make the column headings
+        colnames(table) <- sapply(seq(1:ncol(table)), function(x) { paste(table[1,x], table[2,x], sep = ".") } )
+        
+        # Remove the first and second rows
+        table <- table[-(1:2),]
+        
+        # Remove any leading periods from the column names
+        colnames(table) <- sub("^[.]", "", colnames(table))
+        
+        # Set the first column title
+        colnames(table)[1] <- "First.Name"
+        
+        # Account for instances where the table is blank (early seasons, playoff stats missing)
+        if(nrow(table) == 0) {
+          break()
+        }
+        
+        # Split into first and last names, account for defensive players = teams
+        
+        if(names(positions)[which(positions == position)] == "DEF") {
+          table$Team <- sapply(table[,1], function(x) {gsub("^\\d+[.]\\s+", "", x)})
+          table <- table[,-1]
+        } else {
+          table$Last.Name <- sapply(table$First.Name, function(x) {strsplit(x, split = "[ ]")[[1]][3]})
+          table$First.Name <- sapply(table$First.Name, function(x) {strsplit(x, split = "[ ]")[[1]][2]})
+        }
+        
+        # Add the position, season, and week
+        table$position <- names(positions)[which(positions == position)]
+        table$season <- season
+        table$week <- names(game.weeks)[which(game.weeks == week)]
+        
+        player.stats <- rbind.fill(player.stats, table)
+        # browser()
+      }
     }
   }
 }

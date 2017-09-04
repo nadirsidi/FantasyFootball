@@ -3,60 +3,63 @@ library(dplyr)
 library(ggplot2)
 library(MASS)
 library(scales)
+library(fitdistrplus)
 
 # Read in formatted data
 ffdata.raw <- readRDS("~/Documents/R/FantasyFootball/Data/FFtoday_formatted.RDS")
 
 # Rules --
  
-# Passing - 
-PY = 0.04 # Passing Yard
-INT = -2 # Interception
-PTD = 4 # Passing TD
-TWOPC = 2 # 2-Pt Conversion
-  
-# Rushing -
-RY = 0.1 # Rushing Yard
-TWOPR = 2 # 2-Pt Conversion Rushing
-RTD = 6 # Rushing TD
-     
-# Receiving - 
-REY = 0.1 # Recieving Yard
-TWOPRE = 2 # 2-Pt Conversion Reception
-RETD = 6 # Recieving TD
+# # Passing - 
+# PY = 0.04 # Passing Yard
+# INT = -2 # Interception
+# PTD = 4 # Passing TD
+# TWOPC = 2 # 2-Pt Conversion
+#   
+# # Rushing -
+# RY = 0.1 # Rushing Yard
+# TWOPR = 2 # 2-Pt Conversion Rushing
+# RTD = 6 # Rushing TD
+#      
+# # Receiving - 
+# REY = 0.1 # Recieving Yard
+# TWOPRE = 2 # 2-Pt Conversion Reception
+# RETD = 6 # Recieving TD
+# 
+# # Miscellaneous -
+# # KRTD = 6 # Kick-Return TD
+# # FTD = 6 # Fumbled Recovered for TD
+# # INTTD = 6 # Pick-Six
+# # BLKKRTD = 6 # Blocked Kick Returned for TD
+# # PRTD = 6 # Punt Return TD
+# # FRTD = 6 # Fumbled Returned for TD
+# DTD = 6 # All Defensive TDs
+# FUML = -2 # Fumble
+# 
+# # Kicking -
+# PAT = 1 # Successful point-after
+# FG0 = 3 # 0-39 yd FG
+# FG50 = 5 # 50+ FG
+# FG40 = 4 # 40-49 yd FG
+# FGM = -1 # Missed Field Goal
+# 
+# # Add in the Fantasy Points with Custom Scoring
+# # QB Scoring
+# ffdata$GrnMtn.FPts = 0
+# QB.index = (ffdata$position == "QB")
+# 
+# ffdata$GrnMtn.FPts[QB.index] = ffdata$Passing.Yard[QB.index] * PY + 
+#   ffdata$Passing.INT[QB.index] * INT +
+#   ffdata$Passing.TD[QB.index] * PTD +
+#   ffdata$Rushing.Yard[QB.index] * RY +
+#   ffdata$Rushing.TD[QB.index] * RTD
+# 
+# # It looks like my league's scoring is close to ESPN standard-- using the 
+# # ESPN standard values from FFToday
+# 
+# ffdata <- dplyr::select(ffdata, -GrnMtn.FPts)
 
-# Miscellaneous -
-# KRTD = 6 # Kick-Return TD
-# FTD = 6 # Fumbled Recovered for TD
-# INTTD = 6 # Pick-Six
-# BLKKRTD = 6 # Blocked Kick Returned for TD
-# PRTD = 6 # Punt Return TD
-# FRTD = 6 # Fumbled Returned for TD
-DTD = 6 # All Defensive TDs
-FUML = -2 # Fumble
-
-# Kicking -
-PAT = 1 # Successful point-after
-FG0 = 3 # 0-39 yd FG
-FG50 = 5 # 50+ FG
-FG40 = 4 # 40-49 yd FG
-FGM = -1 # Missed Field Goal
-
-# Add in the Fantasy Points with Custom Scoring
-# QB Scoring
-ffdata$GrnMtn.FPts = 0
-QB.index = (ffdata$position == "QB")
-
-ffdata$GrnMtn.FPts[QB.index] = ffdata$Passing.Yard[QB.index] * PY + 
-  ffdata$Passing.INT[QB.index] * INT +
-  ffdata$Passing.TD[QB.index] * PTD +
-  ffdata$Rushing.Yard[QB.index] * RY +
-  ffdata$Rushing.TD[QB.index] * RTD
-
-# It looks like my league's scoring is close to ESPN standard-- using the 
-# ESPN standard values from FFToday
-
-ffdata <- dplyr::select(ffdata, -GrnMtn.FPts)
+ffdata <- ffdata.raw
 
 # Filter for all QB
 ffdata.QB <- ffdata %>%
@@ -81,6 +84,29 @@ print(QB.Fantasy.FPts.Hist)
 A.Rodgers <- ffdata.QB %>%
   dplyr::filter(First.Name == "Aaron" & Last.Name == "Rodgers")
 
+# Walking throught the fitdistrplus package
+descdist(A.Rodgers$Fantasy.FPts, boot = 100, discrete = F)
+
+# Linearly transform data to facilitate fitting postive distributions
+lambda = floor(min(A.Rodgers$Fantasy.FPts))*-1
+fit.gamma <- fitdist(A.Rodgers$Fantasy.FPts+lambda, "gamma")
+fit.normal <- fitdist(A.Rodgers$Fantasy.FPts+lambda, "norm")
+fit.lognormal <- fitdist(A.Rodgers$Fantasy.FPts+lambda, "lnorm")
+fit.weibull <- fitdist(A.Rodgers$Fantasy.FPts+lambda, "weibull")
+
+# Reverse the data and try the fit
+fit.gamma.flip <- fitdist(100 - A.Rodgers$Fantasy.FPts, "gamma")
+fit.normal.flip <- fitdist(100 - A.Rodgers$Fantasy.FPts, "norm")
+fit.weibull.flip <- fitdist(100 - A.Rodgers$Fantasy.FPts, "weibull")
+
+plot(fit.gamma)
+plot(fit.gamma.flip)
+
+plot(fit.lognormal)
+plot(fit.normal)
+plot(fit.normal.flip)
+plot(fit.weibull)
+
 hist(A.Rodgers$Fantasy.FPts)
 A.Rodgers.Gamma = fitdistr(A.Rodgers$Fantasy.FPts + 10, "gamma")
 A.Rodgers.Plot <- ggplot(data = A.Rodgers) +
@@ -92,10 +118,13 @@ print(A.Rodgers.Plot)
 # Quantiles for A.Rodgers
 qgamma(c(0.05, 0.25, 0.5, 0.75, 0.95), shape = A.Rodgers.Gamma[[1]][1], rate = A.Rodgers.Gamma[[1]][2]) - 10
 
-
 # Looking at Matt Ryan
 M.Ryan <- ffdata.QB %>%
   dplyr::filter(First.Name == "Matt" & Last.Name == "Ryan")
+
+lambda = floor(min(M.Ryan$Fantasy.FPts))*-1
+fit.gamma <- fitdist(M.Ryan$Fantasy.FPts+lambda, "gamma")
+fit.gamma.flip <- fitdist(100 - M.Ryan$Fantasy.FPts, "gamma")
 
 hist(M.Ryan$Fantasy.FPts)
 M.Ryan.Gamma = fitdistr(M.Ryan$Fantasy.FPts + 10, "gamma")
