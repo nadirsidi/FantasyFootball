@@ -71,6 +71,8 @@ QB.Fantasy.FPts.Hist <- ggplot(data = ffdata.QB) +
   geom_histogram(aes(x = Fantasy.FPts)) +
   geom_line(aes(x = 0:50, y = dgamma(0:50,6.736,0.3)),color="red")
 
+print(QB.Fantasy.FPts.Hist)
+
 # Linearly Transform the scores, fit a gamma, graph a non-transformed density function
 QB.FPts.Trans = ffdata.QB$Fantasy.FPts + 10
 QB.FPts.Trans.Gamma = fitdistr(QB.FPts.Trans, "gamma")
